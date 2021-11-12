@@ -15,3 +15,5 @@ TAGS
 out
 .project
 *.swp
+tee-vm-manager/bin/rootfs.cpio
+
