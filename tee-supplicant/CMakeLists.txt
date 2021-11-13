@@ -32,6 +32,8 @@ set (SRC
 	src/tee_supp_fs.c
 	src/tee_supplicant.c
 	src/teec_ta_load.c
+	src/tee_vm_manager.c
+	src/elf_loader.c
 )
 
 if (CFG_GP_SOCKETS)

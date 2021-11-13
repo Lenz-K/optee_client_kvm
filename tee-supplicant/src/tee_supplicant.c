@@ -53,8 +53,7 @@
 #include <tee_supp_fs.h>
 #include <tee_supplicant.h>
 #include <unistd.h>
-
-#include "tee_vm_manager.h"
+#include <tee_vm_manager.h>
 #include "optee_msg_supplicant.h"
 
 #ifndef __aligned

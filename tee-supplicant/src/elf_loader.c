@@ -1,4 +1,4 @@
-#include "../include/elf_loader.h"
+#include <elf_loader.h>
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
@@ -13,7 +13,7 @@ size_t phdrnum;
 int section = -1;
 int has_next = 0;
 
-int open_elf(char *filename) {
+int open_elf(const char *filename) {
     printf("Opening ELF file.\n");
     if (elf_version(EV_CURRENT) == EV_NONE) {
         printf("ELF library initialization failed.\n");

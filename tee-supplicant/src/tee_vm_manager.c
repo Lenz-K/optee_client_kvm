@@ -16,7 +16,6 @@
 int kvm, vmfd, vcpufd;
 u_int32_t memory_slot_count = 0;
 struct kvm_run *run;
-int is_running;
 
 struct memory_mapping {
     uint64_t guest_phys_addr;
@@ -132,7 +131,7 @@ int copy_section_into_memory(Elf64_Word *code, size_t memsz, Elf64_Addr target_a
  *
  * @return The entry address of the loaded program or -1 if an error occurred.
  */
-uint64_t copy_elf_into_memory(char *elf_name) {
+uint64_t copy_elf_into_memory(const char *elf_name) {
     // Open the ELF file that will be loaded into memory
     if (open_elf(elf_name) != 0)
         return -1;
@@ -201,7 +200,6 @@ void close_fd(int fd) {
 }
 
 void close_vm() {
-    is_running = 0;
     close_fd(vcpufd);
     close_fd(vmfd);
     close_fd(kvm);
@@ -252,7 +250,7 @@ int kvm_run() {
 /**
  *
  */
-int vm_setup(char *elf_name) {
+int vm_setup(const char *elf_name) {
     int ret;
     uint64_t *mem;
     size_t mmap_size;
@@ -370,23 +368,14 @@ int vm_setup(char *elf_name) {
     if (ret < 0)
         return ret;
 
-    is_running = 1;
     return 0;
 }
 
-int start_vm(char *elf_name) {
-    int ret = 0;
-
-    if (!is_running) {
-        ret = vm_setup(elf_name);
-    }
-
-    return ret;
+int start_vm(const char *elf_name) {
+    return vm_setup(elf_name);
 }
 
 int run_vm() {
-    if (is_running) {
-        return kvm_run();
-    }
+    return kvm_run();
 }
 
