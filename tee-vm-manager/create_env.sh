@@ -9,5 +9,4 @@ if [ ! -f "$CPIO" ]; then
 fi
 
 cpio -idm -D /media/ramdisk < $CPIO
-cp ./bin/tee.elf /media/ramdisk/usr/lib
-
+cp ./bin/tee.elf /media/ramdisk/usr/bin

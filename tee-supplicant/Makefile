@@ -18,7 +18,9 @@ TEES_SRCS	:= tee_supplicant.c \
 		   teec_ta_load.c \
 		   tee_supp_fs.c \
 		   rpmb.c \
-		   handle.c
+		   handle.c \
+		   tee_vm_manager.c \
+		   elf_loader.c
 
 ifeq ($(CFG_GP_SOCKETS),y)
 TEES_SRCS 	+= tee_socket.c
@@ -76,6 +78,7 @@ endif
 TEES_LFLAGS	+= -lpthread
 # Needed to get clock_gettime() for for glibc versions before 2.17
 TEES_LFLAGS	+= -lrt
+TEES_LFLAGS	+= -lelf
 
 ifeq ($(CFG_TEE_SUPP_PLUGINS),y)
 # Needed to dynamically load user plugins

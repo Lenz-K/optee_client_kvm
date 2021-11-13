@@ -99,6 +99,34 @@ uint64_t *allocate_memory_to_vm(size_t memory_size, uint64_t guest_addr) {
     return allocate_memory_to_vm_with_flags(memory_size, guest_addr, 0);
 }
 
+int find_mapping_for_section(Elf64_Word *code, size_t memsz, Elf64_Addr target_addr) {
+    // Iterate over the memory mappings from high addresses to lower addresses.
+    for (int i = N_MEMORY_MAPPINGS-1; i >= 0; i--) {
+        // As soon as one mapping has a lower guest address as the target address, the right mapping is found.
+        if (memory_mappings[i].guest_phys_addr <= target_addr) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+int copy_section_into_memory(Elf64_Word *code, size_t memsz, Elf64_Addr target_addr, int mmi) {
+    // There can be an offset between memory mapping and the target address.
+    uint64_t offset = target_addr - memory_mappings[mmi].guest_phys_addr;
+
+    // If the offset plus the code size is bigger than the memory mapping size, do nothing.
+    if (offset + memsz > memory_mappings[mmi].memory_size) {
+        printf("Memory mapping too small. Mapping offset: 0x%08lX - Mapping size: 0x%08lX\n", offset, memory_mappings[mmi].memory_size);
+        return -1;
+    }
+
+    // Copy the code into the VM memory
+    memcpy(memory_mappings[mmi].userspace_addr + offset, code, memsz);
+    printf("Section loaded. Host address: %p - Guest address: 0x%08lX\n", memory_mappings[mmi].userspace_addr + offset, target_addr);
+    return 0;
+}
+
 /**
  * Copies the required sections of the ELF file into the memory of the VM.
  *
@@ -116,19 +144,10 @@ uint64_t copy_elf_into_memory(char *elf_name) {
     while (has_next_section_to_load()) {
         if (get_next_section_to_load(&code, &memsz, &target_addr) < 0)
             return -1;
-
-        // Iterate over the memory mappings from high addresses to lower addresses.
-        for (int i = N_MEMORY_MAPPINGS-1; i >= 0; i--) {
-            // As soon as one mapping has a lower guest address as the target address, the right mapping is found.
-            if (memory_mappings[i].guest_phys_addr <= target_addr) {
-                // There can be an offset between memory mapping and the target address.
-                uint64_t offset = target_addr - memory_mappings[i].guest_phys_addr;
-                // Copy the code into the VM memory
-                memcpy(memory_mappings[i].userspace_addr + offset, code, memsz);
-                printf("Section loaded. Host adress: %p - Guest address: 0x%08lX\n", memory_mappings[i].userspace_addr + offset, target_addr);
-                break;
-            }
-        }
+        if ((int mmi = find_mapping_for_section(code, memsz, target_addr)) < 0)
+            return -1;
+        if (copy_section_into_memory(code, memsz, target_addr, mmi) < 0)
+            return -1;
     }
 
     uint64_t entry_addr = get_entry_address();

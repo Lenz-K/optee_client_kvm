@@ -54,6 +54,7 @@
 #include <tee_supplicant.h>
 #include <unistd.h>
 
+#include "tee_vm_manager.h"
 #include "optee_msg_supplicant.h"
 
 #ifndef __aligned
@@ -442,6 +443,8 @@ static int open_dev(const char *devname, uint32_t *gen_caps)
 
 	memset(&vers, 0, sizeof(vers));
 
+	DMSG("devname: %s", devname);
+	EMSG("devname: %s", devname);
 	fd = open(devname, O_RDWR);
 	if (fd < 0)
 		return -1;
@@ -460,6 +463,7 @@ static int open_dev(const char *devname, uint32_t *gen_caps)
 	DMSG("using device \"%s\"", devname);
 	return fd;
 err:
+	close_vm();
 	close(fd);
 	return -1;
 }
@@ -711,6 +715,13 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	if (start_vm("/media/ramdisk/usr/bin/tee.elf") < 0)
+		return EXIT_FAILURE;
+
+	for (int j = 0; j < 100; j++) {
+		run_vm();
+	}
+
 	if (dev) {
 		arg.fd = open_dev(dev, &arg.gen_caps);
 		if (arg.fd < 0) {
@@ -735,6 +746,7 @@ int main(int argc, char *argv[])
 			arg.abort = true;
 	}
 
+	close_vm();
 	close(arg.fd);
 
 	return EXIT_FAILURE;

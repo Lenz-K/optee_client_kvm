@@ -32,6 +32,10 @@ build-libteec:
 
 build-tee-supplicant: build-libteec
 	@echo "Building tee-supplicant"
+	ln -sf ${CURDIR}/tee-vm-manager/include/tee_vm_manager.h ${CURDIR}/tee-supplicant/src
+	ln -sf ${CURDIR}/tee-vm-manager/src/tee_vm_manager.c ${CURDIR}/tee-supplicant/src
+	ln -sf ${CURDIR}/tee-vm-manager/include/elf_loader.h ${CURDIR}/tee-supplicant/src
+	ln -sf ${CURDIR}/tee-vm-manager/src/elf_loader.c ${CURDIR}/tee-supplicant/src
 	$(MAKE) --directory=tee-supplicant  --no-print-directory --no-builtin-variables CFG_TEE_SUPP_LOG_LEVEL=$(CFG_TEE_SUPP_LOG_LEVEL)
 
 build: build-libteec build-tee-supplicant build-libckteec
