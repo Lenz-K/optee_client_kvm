@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+
 #include "tee_vm_manager.h"
 #include "elf_loader.h"
 
@@ -32,7 +33,7 @@ struct memory_mapping memory_mappings[N_MEMORY_MAPPINGS];
  * @param name The name of the ioctl request for error output.
  * @return The return value of the ioctl.
  */
-int ioctl_exit_on_error(int file_descriptor, unsigned long request, char *name, ...) {
+int ioctl_exit_on_error(int file_descriptor, unsigned long request, const char *name, ...) {
     va_list ap;
     va_start(ap, name);
     void *arg = va_arg(ap, void *);
@@ -53,7 +54,7 @@ int ioctl_exit_on_error(int file_descriptor, unsigned long request, char *name, 
  * @param name The name of the extension for log statements.
  * @return The return value of the involved ioctl.
  */
-int check_vm_extension(int extension, char *name) {
+int check_vm_extension(int extension, const char *name) {
     int ret = ioctl(vmfd, KVM_CHECK_EXTENSION, extension);
     if (ret < 0) {
         printf("System call 'KVM_CHECK_EXTENSION' failed: %s\n", strerror(errno));
