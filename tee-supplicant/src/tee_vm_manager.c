@@ -98,7 +98,13 @@ uint64_t *allocate_memory_to_vm(size_t memory_size, uint64_t guest_addr) {
     return allocate_memory_to_vm_with_flags(memory_size, guest_addr, 0);
 }
 
-int find_mapping_for_section(Elf64_Word *code, size_t memsz, Elf64_Addr target_addr) {
+/**
+ * Finds the memory mapping for the specified target_addr.
+ *
+ * @param target_addr The guest address that will be searched for in the memory mappings.
+ * @return Returns the index of the memory mapping or -1 if no mapping was found.
+ */
+int find_mapping_for_section(uint64_t target_addr) {
     // Iterate over the memory mappings from high addresses to lower addresses.
     for (int i = N_MEMORY_MAPPINGS-1; i >= 0; i--) {
         // As soon as one mapping has a lower guest address as the target address, the right mapping is found.
@@ -110,7 +116,16 @@ int find_mapping_for_section(Elf64_Word *code, size_t memsz, Elf64_Addr target_a
     return -1;
 }
 
-int copy_section_into_memory(Elf64_Word *code, size_t memsz, Elf64_Addr target_addr, int mmi) {
+/**
+ * Copies the code into the memory of the specified memory mapping.
+ *
+ * @param code The code blok that will be copied into the VM memory.
+ * @param memsz The size of the code block.
+ * @param target_addr The VM memory address that the code will be copied to.
+ * @param mmi The index of the memory mapping that will be used for copying.
+ * @return Returns the index of the memory mapping or -1 if no mapping was found.
+ */
+int copy_section_into_memory(uint32_t *code, size_t memsz, uint64_t target_addr, int mmi) {
     // There can be an offset between memory mapping and the target address.
     uint64_t offset = target_addr - memory_mappings[mmi].guest_phys_addr;
 
@@ -129,29 +144,29 @@ int copy_section_into_memory(Elf64_Word *code, size_t memsz, Elf64_Addr target_a
 /**
  * Copies the required sections of the ELF file into the memory of the VM.
  *
- * @return The entry address of the loaded program or -1 if an error occurred.
+ * @return 0 on success, -1 if an error occurred.
  */
-uint64_t copy_elf_into_memory(const char *elf_name) {
+int copy_elf_into_memory(const char *elf_name) {
     // Open the ELF file that will be loaded into memory
     if (open_elf(elf_name) != 0)
         return -1;
 
-    Elf64_Word *code;
+    uint32_t *code;
     size_t memsz;
-    Elf64_Addr target_addr;
+    uint64_t target_addr;
     // Iterate over the segments in the ELF file and load them into the memory of the VM
     while (has_next_section_to_load()) {
         if (get_next_section_to_load(&code, &memsz, &target_addr) < 0)
             return -1;
-        if ((int mmi = find_mapping_for_section(code, memsz, target_addr)) < 0)
+        int mmi = find_mapping_for_section(target_addr);
+        if (mmi < 0)
             return -1;
         if (copy_section_into_memory(code, memsz, target_addr, mmi) < 0)
             return -1;
     }
 
-    uint64_t entry_addr = get_entry_address();
     close_elf();
-    return entry_addr;
+    return 0;
 }
 
 /**
@@ -317,9 +332,9 @@ int vm_setup(const char *elf_name) {
     mem = allocate_memory_to_vm(memory_mappings[1].memory_size, memory_mappings[1].guest_phys_addr);
     memory_mappings[1].userspace_addr = mem;
 
-    uint64_t entry_addr = copy_elf_into_memory(elf_name);
-    if (entry_addr < 0)
-        return entry_addr;
+    ret = copy_elf_into_memory(elf_name);
+    if (ret < 0)
+        return ret;
 
     /* MMIO Memory */
     check_vm_extension(KVM_CAP_READONLY_MEM, "KVM_CAP_READONLY_MEM"); // This will cause a write to 0x10000000, to result in a KVM_EXIT_MMIO.
@@ -360,9 +375,10 @@ int vm_setup(const char *elf_name) {
     }
 
     /* Set program counter to entry address */
-    printf("Setting program counter to entry address 0x%08lX\n", entry_addr);
     check_vm_extension(KVM_CAP_ONE_REG, "KVM_CAP_ONE_REG");
     uint64_t pc_id = 0x6030000000100040;
+    uint64_t entry_addr = get_entry_address();
+    printf("Setting program counter to entry address 0x%08lX\n", entry_addr);
     struct kvm_one_reg pc = {.id = pc_id, .addr = (uint64_t)&entry_addr};
     ret = ioctl_exit_on_error(vcpufd, KVM_SET_ONE_REG, "KVM_SET_ONE_REG", &pc);
     if (ret < 0)

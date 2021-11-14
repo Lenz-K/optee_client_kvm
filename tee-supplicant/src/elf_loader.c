@@ -1,9 +1,5 @@
-#include <cstdio>
-#include <cerrno>
-#include <string>
-#include <android/asset_manager.h>
-#include <android/asset_manager_jni.h>
-#include <android/log.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "elf_loader.h"
 
@@ -20,17 +16,8 @@
 #define OFFSET_P_OFFSET 0x8
 #define OFFSET_P_FILE_SIZE 0x20
 
-#define TAG "HELLO_KVM"
-
-#define PATH "bin"
-#define FILENAME "tee.elf"
-#define URI "bin/tee.elf"
-
-// AAssetManager variables
-AAssetManager *mgr;
-AAssetDir* assetDir;
-AAsset* asset;
-
+// The ELF file
+FILE *fp;
 // The current position in the ELF file
 int byte_index = 0;
 
@@ -51,30 +38,26 @@ int section = -1;
 int has_next = 0;
 
 /**
+ * Fast forward in the ELF file to the specified absolut offset.
+ *
+ * @param offset The offset to go to.
+ */
+void to(int offset) {
+    int forward = offset - byte_index;
+    uint8_t byte[forward];
+    fread(byte, sizeof(byte[0]), forward, fp);
+    byte_index = offset;
+}
+
+/**
  * Read from the ELF file.
  * This keeps the current byte_index up to date.
  *
  * @param offset The offset to go to.
  */
-void read(void *mem, int n_b) {
-    int ret = AAsset_read(asset, mem, n_b);
-    int read_b = ret;
-    while (read_b < n_b && ret > 0) {
-        ret = AAsset_read(asset, mem, n_b);
-        read_b += ret;
-    }
-    byte_index += read_b;
-}
-
-/**
- * Fast forward in the ELF file to the specified absolut offset.
- *
- * @param off The offset to go to.
- */
-void to(int off) {
-    int forward = off - byte_index;
-    uint8_t byte[forward];
-    read(byte, forward);
+void read(void *mem, size_t size, int n_b) {
+    byte_index += size * n_b;
+    fread(mem, size, n_b, fp);
 }
 
 /**
@@ -94,28 +77,28 @@ void parse_program_header(uint64_t phoff, uint16_t phentsize) {
         to(phoff + i * phentsize);
         
         uint32_t p_type;
-        read(&p_type, sizeof(p_type));
+        read(&p_type, sizeof(p_type), 1);
         do_load[i] = p_type == PT_LOAD;
         
         if (do_load[i]) {
             to(phoff + i * phentsize + OFFSET_P_OFFSET);
             
             uint64_t p_offset;
-            read(&p_offset, sizeof(p_offset));
+            read(&p_offset, sizeof(p_offset), 1);
             offset[i] = p_offset;
         
             uint64_t p_vaddr;
-            read(&p_vaddr, sizeof(p_vaddr));
+            read(&p_vaddr, sizeof(p_vaddr), 1);
             vaddr[i] = p_vaddr;
         
             to(phoff + i * phentsize + OFFSET_P_FILE_SIZE);
             
             uint64_t p_filesz;
-            read(&p_filesz, sizeof(p_filesz));
+            read(&p_filesz, sizeof(p_filesz), 1);
             filesz[i] = p_filesz;
         
             uint64_t p_memsz;
-            read(&p_memsz, sizeof(p_memsz));
+            read(&p_memsz, sizeof(p_memsz), 1);
             memsz[i] = p_memsz;
         }
     }
@@ -126,68 +109,37 @@ void parse_program_header(uint64_t phoff, uint16_t phentsize) {
     }
 }
 
-bool elf_file_exists() {
-    const char* filename;
-    bool found;
-    do {
-        filename = AAssetDir_getNextFileName(assetDir);
-        found = strcmp(filename, FILENAME) == 0;
-    } while (filename != NULL && !found);
-    return found;
-}
-
-int open_elf(AAssetManager *pmgr) {
-    if (pmgr == nullptr) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, "AAssetManager is null");
-        return -1;
-    }
-    mgr = pmgr;
-    __android_log_print(ANDROID_LOG_INFO, TAG, "Opening ELF file");
-
-    assetDir = AAssetManager_openDir(mgr, PATH);
-    if (assetDir == nullptr) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, "AAssetDir is null");
-        return -1;
-    }
-
-    if (!elf_file_exists()) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, "ELF file not found");
-        return -1;
-    }
-
-    asset = AAssetManager_open(mgr, URI, AASSET_MODE_STREAMING);
-    if (asset == nullptr) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, "AAsset is null");
-        return -1;
-    }
+int open_elf(const char *path) {
+    printf("Opening ELF file\n");
+    fp = fopen(path, "rb");
 
     to(BIT_ARCH);
     uint8_t flag;
-    read(&flag, sizeof(flag));
+    read(&flag, sizeof(flag), 1);
     if (flag != 2) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, "ELF not for 64-bit architecture");
+        printf("Not a 64-bit ELF object.\n");
         return -1;
     }
-    read(&flag, sizeof(flag));
+    read(&flag, sizeof(flag), 1);
     if (flag != 1) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, "ELF not little endian.");
+        printf("Not little endian.\n");
         return -1;
     }
 
     to(ENTRY);
-    read(&entry_address, sizeof(entry_address));
+    read(&entry_address, sizeof(entry_address), 1);
 
     uint64_t phoff;
-    read(&phoff, sizeof(phoff));
+    read(&phoff, sizeof(phoff), 1);
 
     to(P_H_ENT_SIZE);
     uint16_t phentsize;
-    read(&phentsize, sizeof(phentsize));
+    read(&phentsize, sizeof(phentsize), 1);
 
     uint16_t phnum;
-    read(&phnum, sizeof(phnum));
+    read(&phnum, sizeof(phnum), 1);
     p_hdr_n = phnum;
-    __android_log_print(ANDROID_LOG_INFO, TAG, "It contains %d sections", p_hdr_n);
+    printf("It contains %d sections\n", p_hdr_n);
 
     parse_program_header(phoff, phentsize);
 
@@ -199,9 +151,9 @@ int has_next_section_to_load() {
         section++;
         has_next = do_load[section];
         if (has_next) {
-            __android_log_print(ANDROID_LOG_INFO, TAG, "Section %d needs to be loaded", section);
+            printf("Section %d needs to be loaded\n", section);
         } else {
-            __android_log_print(ANDROID_LOG_INFO, TAG, "Section %d does not need to be loaded", section);
+            printf("Section %d does not need to be loaded\n", section);
         }
     } while (!has_next && section + 1 < p_hdr_n);
 
@@ -210,13 +162,14 @@ int has_next_section_to_load() {
 
 int get_next_section_to_load(uint32_t **code, size_t *memory_size, uint64_t *vaddress) {
     if (!has_next) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, "No more section available. "
-               "Check availability with has_next_section_to_load() prior to calling this method.");
+        printf("No more section available. "
+               "Check availability with has_next_section_to_load() prior to calling this method.\n");
         return -1;
     }
 
+    code_blocks[section] = (uint32_t *) malloc(memsz[section]);
     to(offset[section]);
-    read(code_blocks[section], filesz[section]);
+    read(code_blocks[section], sizeof(uint32_t), filesz[section] / sizeof(uint32_t));
 
     *code = code_blocks[section];
     *memory_size = memsz[section];
@@ -230,7 +183,9 @@ uint64_t get_entry_address() {
 }
 
 void close_elf() {
-    __android_log_print(ANDROID_LOG_INFO, TAG, "Closing ELF file");
+    printf("Closing ELF file\n");
+    fclose(fp);
+    
     free(do_load);
     free(offset);
     free(vaddr);
@@ -241,8 +196,5 @@ void close_elf() {
         free(code_blocks[i]);
     }
     free(code_blocks);
-
-    AAsset_close(asset);
-    AAssetDir_close(assetDir);
 }
 
