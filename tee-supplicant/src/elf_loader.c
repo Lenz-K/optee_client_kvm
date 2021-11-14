@@ -41,18 +41,18 @@ int has_next = 0;
  * Read from the ELF file.
  * This keeps the current byte_index up to date.
  *
- * @param mem The pointer to read to
+ * @param mem The pointer where to store the read bytes
  * @param size The size of the blocks to read
  * @param n The number of blocks to read
  */
 void read(void *mem, size_t size, int n) {
     int ret = fread(mem, size, n, fp);
-    int read_b = ret;
-    while (read_b < n && ret > 0) {
+    int read_n = ret;
+    while (read_n < n && ret > 0) {
         ret = fread(mem, size, n, fp);
-        read_b += ret;
+        read_n += ret;
     }
-    byte_index += read_b;
+    byte_index += read_n * size;
 }
 
 /**
