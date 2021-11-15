@@ -684,6 +684,7 @@ static void *thread_main(void *a)
 
 int main(int argc, char *argv[])
 {
+	EMSG("main()");
 	struct thread_arg arg = { .fd = -1 };
 	bool daemonize = false;
 	char *dev = NULL;
