@@ -442,19 +442,21 @@ static int open_dev(const char *devname, uint32_t *gen_caps)
 
 	memset(&vers, 0, sizeof(vers));
 
-	DMSG("devname: %s", devname);
-	EMSG("devname: %s", devname);
+	printf("devname: %s\n", devname);
 	fd = open(devname, O_RDWR);
+	printf("fd: %d\n", fd);
 	if (fd < 0)
 		return -1;
 
 	if (ioctl(fd, TEE_IOC_VERSION, &vers))
 		goto err;
+	printf("ioctl ok\n");
 
 	/* Only OP-TEE supported */
 	if (vers.impl_id != TEE_IMPL_ID_OPTEE)
 		goto err;
 
+	printf("is gen_caps: %u\n", *gen_caps);
 	ta_dir = "optee_armtz";
 	if (gen_caps)
 		*gen_caps = vers.gen_caps;
