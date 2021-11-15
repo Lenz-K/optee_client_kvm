@@ -714,9 +714,11 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	EMSG("start_vm()");
 	if (start_vm("/media/ramdisk/usr/bin/tee.elf") < 0)
 		return EXIT_FAILURE;
 
+	EMSG("run_vm()");
 	for (int j = 0; j < 100; j++) {
 		run_vm();
 	}

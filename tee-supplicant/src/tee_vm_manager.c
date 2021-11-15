@@ -33,7 +33,7 @@ struct memory_mapping memory_mappings[N_MEMORY_MAPPINGS];
  * @param name The name of the ioctl request for error output.
  * @return The return value of the ioctl.
  */
-int ioctl_exit_on_error(int file_descriptor, unsigned long request, const char *name, ...) {
+static int ioctl_exit_on_error(int file_descriptor, unsigned long request, const char *name, ...) {
     va_list ap;
     va_start(ap, name);
     void *arg = va_arg(ap, void *);
@@ -54,7 +54,7 @@ int ioctl_exit_on_error(int file_descriptor, unsigned long request, const char *
  * @param name The name of the extension for log statements.
  * @return The return value of the involved ioctl.
  */
-int check_vm_extension(int extension, const char *name) {
+static int check_vm_extension(int extension, const char *name) {
     int ret = ioctl(vmfd, KVM_CHECK_EXTENSION, extension);
     if (ret < 0) {
         printf("System call 'KVM_CHECK_EXTENSION' failed: %s\n", strerror(errno));
@@ -75,7 +75,7 @@ int check_vm_extension(int extension, const char *name) {
  * @param flags The flags for the KVM memory region.
  * @return A pointer to the allocated memory.
  */
-uint64_t *allocate_memory_to_vm_with_flags(size_t memory_size, uint64_t guest_addr, uint32_t flags) {
+static uint64_t *allocate_memory_to_vm_with_flags(size_t memory_size, uint64_t guest_addr, uint32_t flags) {
     void *void_mem = mmap(NULL, memory_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     uint64_t *mem = void_mem;
     if (!mem) {
@@ -95,7 +95,7 @@ uint64_t *allocate_memory_to_vm_with_flags(size_t memory_size, uint64_t guest_ad
     return mem;
 }
 
-uint64_t *allocate_memory_to_vm(size_t memory_size, uint64_t guest_addr) {
+static uint64_t *allocate_memory_to_vm(size_t memory_size, uint64_t guest_addr) {
     return allocate_memory_to_vm_with_flags(memory_size, guest_addr, 0);
 }
 
@@ -105,7 +105,7 @@ uint64_t *allocate_memory_to_vm(size_t memory_size, uint64_t guest_addr) {
  * @param target_addr The guest address that will be searched for in the memory mappings.
  * @return Returns the index of the memory mapping or -1 if no mapping was found.
  */
-int find_mapping_for_section(uint64_t target_addr) {
+static int find_mapping_for_section(uint64_t target_addr) {
     // Iterate over the memory mappings from high addresses to lower addresses.
     for (int i = N_MEMORY_MAPPINGS-1; i >= 0; i--) {
         // As soon as one mapping has a lower guest address as the target address, the right mapping is found.
@@ -126,7 +126,7 @@ int find_mapping_for_section(uint64_t target_addr) {
  * @param mmi The index of the memory mapping that will be used for copying.
  * @return Returns the index of the memory mapping or -1 if no mapping was found.
  */
-int copy_section_into_memory(uint32_t *code, size_t memsz, uint64_t target_addr, int mmi) {
+static int copy_section_into_memory(uint32_t *code, size_t memsz, uint64_t target_addr, int mmi) {
     // There can be an offset between memory mapping and the target address.
     uint64_t offset = target_addr - memory_mappings[mmi].guest_phys_addr;
 
@@ -147,7 +147,7 @@ int copy_section_into_memory(uint32_t *code, size_t memsz, uint64_t target_addr,
  *
  * @return 0 on success, -1 if an error occurred.
  */
-int copy_elf_into_memory(const char *elf_name) {
+static int copy_elf_into_memory(const char *elf_name) {
     // Open the ELF file that will be loaded into memory
     if (open_elf(elf_name) != 0)
         return -1;
@@ -173,7 +173,7 @@ int copy_elf_into_memory(const char *elf_name) {
 /**
  * Handles a MMIO exit from KVM_RUN.
  */
-void mmio_exit_handler() {
+static void mmio_exit_handler(void) {
     if (!run->mmio.is_write) {
         return;
     }
@@ -182,18 +182,19 @@ void mmio_exit_handler() {
 
     if (run->mmio.is_write) {
         uint64_t data = 0;
-        for (int j = 0; j < run->mmio.len; j++) {
+        int length = run->mmio.len;
+        for (int j = 0; j < length; j++) {
             data |= run->mmio.data[j]<<8*j;
         }
 
-        printf("Guest wrote 0x%08lX (length=%d)\n", data, run->mmio.len);
+        printf("Guest wrote 0x%08lX (length=%d)\n", data, length);
     }
 }
 
 /**
  * Prints the reason of a system event exit from KVM_RUN.
  */
-void print_system_event_exit_reason() {
+static void print_system_event_exit_reason(void) {
     switch (run->system_event.type) {
     case KVM_SYSTEM_EVENT_SHUTDOWN:
         printf("Cause: Shutdown\n");
@@ -204,18 +205,20 @@ void print_system_event_exit_reason() {
     case KVM_SYSTEM_EVENT_CRASH:
         printf("Cause: Crash\n");
         break;
+    default:
+        printf("Cause: Unknown\n");
     }
 }
 
 /**
  * Closes a file descriptor and therefore frees its resources.
  */
-void close_fd(int fd) {
+static void close_fd(int fd) {
     if (close(fd) == -1)
         printf("Error while closing file: %s\n", strerror(errno));
 }
 
-void close_vm() {
+void close_vm(void) {
     close_fd(vcpufd);
     close_fd(vmfd);
     close_fd(kvm);
@@ -225,7 +228,7 @@ void close_vm() {
 /**
  * 
  */
-int kvm_run() {
+static int kvm_run(void) {
     //printf("\n--- KVM_RUN ---\n");
     int ret = ioctl(vcpufd, KVM_RUN, NULL);
     if (ret < 0) {
@@ -266,7 +269,7 @@ int kvm_run() {
 /**
  *
  */
-int vm_setup(const char *elf_name) {
+static int vm_setup(const char *elf_name) {
     int ret;
     uint64_t *mem;
     size_t mmap_size;
@@ -392,7 +395,7 @@ int start_vm(const char *elf_name) {
     return vm_setup(elf_name);
 }
 
-int run_vm() {
+int run_vm(void) {
     return kvm_run();
 }
 

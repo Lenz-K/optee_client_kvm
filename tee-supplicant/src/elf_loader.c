@@ -45,7 +45,7 @@ int has_next = 0;
  * @param size The size of the blocks to read
  * @param n The number of blocks to read
  */
-void read(void *mem, size_t size, int n) {
+static void read(void *mem, size_t size, int n) {
     int ret = fread(mem, size, n, fp);
     int read_n = ret;
     while (read_n < n && ret > 0) {
@@ -60,7 +60,7 @@ void read(void *mem, size_t size, int n) {
  *
  * @param off The offset to go to.
  */
-void to(int off) {
+static void to(int off) {
     int forward = off - byte_index;
     uint8_t byte[forward];
     read(byte, sizeof(byte[0]), forward);
@@ -72,7 +72,7 @@ void to(int off) {
  * @param phoff The offset of the program header in the ELF file.
  * @param phentsize The size of one entry in the program header.
  */
-void parse_program_header(uint64_t phoff, uint16_t phentsize) {
+static void parse_program_header(uint64_t phoff, uint16_t phentsize) {
     do_load = (int *) malloc(p_hdr_n * sizeof(int));
     offset = (uint64_t *) malloc(p_hdr_n * sizeof(uint64_t));
     vaddr = (uint64_t *) malloc(p_hdr_n * sizeof(uint64_t));
@@ -152,7 +152,7 @@ int open_elf(const char *path) {
     return 0;
 }
 
-int has_next_section_to_load() {
+int has_next_section_to_load(void) {
     do {
         section++;
         has_next = do_load[section];
@@ -184,11 +184,11 @@ int get_next_section_to_load(uint32_t **code, size_t *memory_size, uint64_t *vad
     return 0;
 }
 
-uint64_t get_entry_address() {
+uint64_t get_entry_address(void) {
     return entry_address;
 }
 
-void close_elf() {
+void close_elf(void) {
     printf("Closing ELF file\n");
     fclose(fp);
     
