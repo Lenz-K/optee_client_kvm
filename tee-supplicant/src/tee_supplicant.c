@@ -698,10 +698,12 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (argc > 3)
+	if (argc > 4)
 		return usage(EXIT_FAILURE);
 
-	for (i = 1; i < argc; i++) {
+	const char *elf_file_uri = argv[1];
+
+	for (i = 2; i < argc; i++) {
 		if (!strcmp(argv[i], "-d"))
 			daemonize = true;
 		else if (!strcmp(argv[i], "-h"))
@@ -716,7 +718,7 @@ int main(int argc, char *argv[])
 	}
 
 	EMSG("start_vm()");
-	if (start_vm("/media/ramdisk/usr/bin/tee.elf") < 0)
+	if (start_vm(elf_file_uri) < 0)
 		return EXIT_FAILURE;
 
 	EMSG("run_vm()");
