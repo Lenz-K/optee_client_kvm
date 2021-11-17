@@ -14,6 +14,8 @@
 
 #define N_MEMORY_MAPPINGS 2
 
+#define PC_ID 0x6030000000100040
+
 int kvm, vmfd, vcpufd;
 u_int32_t memory_slot_count = 0;
 struct kvm_run *run;
@@ -380,10 +382,9 @@ static int vm_setup(const char *elf_name) {
 
     /* Set program counter to entry address */
     check_vm_extension(KVM_CAP_ONE_REG, "KVM_CAP_ONE_REG");
-    uint64_t pc_id = 0x6030000000100040;
     uint64_t entry_addr = get_entry_address();
     printf("Setting program counter to entry address 0x%08lX\n", entry_addr);
-    struct kvm_one_reg pc = {.id = pc_id, .addr = (uint64_t)&entry_addr};
+    struct kvm_one_reg pc = {.id = PC_ID, .addr = (uint64_t)&entry_addr};
     ret = ioctl_exit_on_error(vcpufd, KVM_SET_ONE_REG, "KVM_SET_ONE_REG", &pc);
     if (ret < 0)
         return ret;
